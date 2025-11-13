@@ -109,7 +109,7 @@ class GaussianForegroundSimulator:
         freq : float
             Frequency in GHz
         beam_fwhm : float
-            Beam FWHM in arcmin
+            Gaussian beam FWHM in arcmin
         nside : int
             HEALPix nside parameter
         alms_d_EE, alms_d_BB : array
