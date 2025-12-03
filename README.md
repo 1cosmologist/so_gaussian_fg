@@ -7,6 +7,8 @@ This repo contains a script and a notebook to generate Gaussian foregrounds for 
 Requires `skytools` for emission law and unit conversion. (`conda install skytools`)
 
 #### Running the script
+The default instruemnt and foreground parameters are available under `sample config`. To run simulation with a script and yaml files for configuration.
+
 ```
-python generate_gaussian_fg.py
+python run_simulations.py
 ```
