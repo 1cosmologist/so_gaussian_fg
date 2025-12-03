@@ -1,7 +1,7 @@
 # Simons Observatory instrument parameters
 
-LF021:
-  central_freq_GHz: 21.
+LF027:
+  central_freq_GHz: 27.
   beam_fwhm_arcmin: 91.
   noise_uK_arcmin: 16.
   ell_knee: 30
