@@ -1,0 +1,18 @@
+# Foreground model parameters from Wolz et al. 2024
+
+# Dust model parameters
+A_dust_EE: 56        # uK_CMB^2
+A_dust_BB: 28        # uK_CMB^2
+alpha_dust_EE: -0.32
+alpha_dust_BB: -0.16
+freq_piv_dust: 353.  # GHz
+beta_dust: 1.54
+T_dust: 20.          # K
+
+# Synchrotron model parameters
+A_sync_EE: 9.        # uK_CMB^2
+A_sync_BB: 1.6       # uK_CMB^2
+alpha_sync_EE: -0.7
+alpha_sync_BB: -0.93
+freq_piv_sync: 23.   # GHz
+beta_sync: -3.
