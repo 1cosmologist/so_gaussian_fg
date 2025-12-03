@@ -7,43 +7,140 @@ import healpy as hp
 import numpy as np
 import skytools as st
 import os
+import yaml
 from pathlib import Path
 from tqdm import tqdm
+
+
+def load_params(params):
+    """
+    Load parameters from a dictionary or YAML file path.
+    
+    Parameters
+    ----------
+    params : dict or str or Path
+        Either a dictionary of parameters or a path to a YAML file
+        
+    Returns
+    -------
+    dict
+        Dictionary of parameters
+    """
+    if params is None:
+        return {}
+    elif isinstance(params, dict):
+        return params
+    elif isinstance(params, (str, Path)):
+        with open(params, 'r') as f:
+            loaded = yaml.safe_load(f)
+            return loaded if loaded is not None else {}
+    else:
+        raise ValueError(f"params must be a dict or path to YAML file, got {type(params)}")
 
 
 class GaussianForegroundSimulator:
     """
     Class to simulate polarized foreground maps (dust + synchrotron)
     for Simons Observatory frequency channels.
+    
+    Parameters
+    ----------
+    fg_params : dict or str or Path, optional
+        Foreground model parameters. Can be a dictionary or path to a YAML file.
+        Keys can include:
+        - A_dust_EE, A_dust_BB: Dust amplitudes in uK_CMB^2
+        - alpha_dust_EE, alpha_dust_BB: Dust power law indices
+        - freq_piv_dust: Dust pivot frequency in GHz
+        - beta_dust: Dust spectral index
+        - T_dust: Dust temperature in K
+        - A_sync_EE, A_sync_BB: Synchrotron amplitudes in uK_CMB^2
+        - alpha_sync_EE, alpha_sync_BB: Synchrotron power law indices
+        - freq_piv_sync: Synchrotron pivot frequency in GHz
+        - beta_sync: Synchrotron spectral index
+    instr_params : dict or str or Path, optional
+        Instrument parameters. Can be a dictionary or path to a YAML file.
+        Keys can include:
+        - freqs: List of frequencies in GHz
+        - beams: List of beam FWHMs in arcmin
+        - nsides: List of HEALPix nside values
     """
     
-    def __init__(self):
-        # Dust model parameters
-        self.A_dust_EE = 56  # uK_CMB^2
-        self.A_dust_BB = 28  # uK_CMB^2
-        self.alpha_dust_EE = -0.32
-        self.alpha_dust_BB = -0.16
-        self.freq_piv_dust = 353.  # GHz
-        self.beta_dust = 1.54
-        self.T_dust = 20.  # K
+    def __init__(self, fg_params=None, instr_params=None):
+        # Load parameters from dict or YAML file
+        fg = load_params(fg_params)
+        instr = load_params(instr_params)
         
-        # Synchrotron model parameters
-        self.A_sync_EE = 9.  # uK_CMB^2
-        self.A_sync_BB = 1.6  # uK_CMB^2
-        self.alpha_sync_EE = -0.7
-        self.alpha_sync_BB = -0.93
-        self.freq_piv_sync = 23.  # GHz
-        self.beta_sync = -3.
+        # Dust model parameters (with defaults)
+        self.A_dust_EE = fg.get('A_dust_EE', 56)  # uK_CMB^2
+        self.A_dust_BB = fg.get('A_dust_BB', 28)  # uK_CMB^2
+        self.alpha_dust_EE = fg.get('alpha_dust_EE', -0.32)
+        self.alpha_dust_BB = fg.get('alpha_dust_BB', -0.16)
+        self.freq_piv_dust = fg.get('freq_piv_dust', 353.)  # GHz
+        self.beta_dust = fg.get('beta_dust', 1.54)
+        self.T_dust = fg.get('T_dust', 20.)  # K
         
-        # SO instrument parameters
-        self.so_freqs = np.array([21, 39, 93, 145, 225, 280])  # GHz
-        self.so_beams = np.array([91., 63., 30., 17., 11., 9.])  # arcmin
-        self.so_nside = np.array([128, 128, 512, 512, 1024, 1024])
-        self.lmax = 3 * int(self.so_nside.max()) - 1
+        # Synchrotron model parameters (with defaults)
+        self.A_sync_EE = fg.get('A_sync_EE', 9.)  # uK_CMB^2
+        self.A_sync_BB = fg.get('A_sync_BB', 1.6)  # uK_CMB^2
+        self.alpha_sync_EE = fg.get('alpha_sync_EE', -0.7)
+        self.alpha_sync_BB = fg.get('alpha_sync_BB', -0.93)
+        self.freq_piv_sync = fg.get('freq_piv_sync', 23.)  # GHz
+        self.beta_sync = fg.get('beta_sync', -3.)
+        
+        # Instrument parameters - handle nested format or flat format
+        self._parse_instr_params(instr)
+        self.lmax = 3 * int(self.instr_nside.max()) - 1
         
         # Precompute power spectra
         self.cl_dust_EE, self.cl_dust_BB = self.dust_cl()
         self.cl_sync_EE, self.cl_sync_BB = self.sync_cl()
+    
+    def _parse_instr_params(self, instr):
+        """
+        Parse instrument parameters from either nested or flat format.
+        
+        Nested format (per-channel):
+            LF21:
+                central_freq_GHz: 21.
+                beam_fwhm_arcmin: 91.
+                nside: 512
+        
+        Flat format:
+            freqs: [21, 39, ...]
+            beams: [91., 63., ...]
+            nsides: [512, 512, ...]
+        """
+        # Default values
+        default_channels = ['LF021', 'LF039', 'MF093', 'MF145', 'HF225', 'HF280']
+        default_freqs = [21., 39., 93., 145., 225., 280.]
+        default_beams = [91., 63., 30., 17., 11., 9.]
+        default_nsides = [512, 512, 512, 512, 512, 512]
+        
+        if not instr:
+            # Use defaults
+            self.channel_names = default_channels
+            self.instr_freqs = np.array(default_freqs)
+            self.instr_beams = np.array(default_beams)
+            self.instr_nside = np.array(default_nsides)
+            return
+        
+        # Check if it's nested format (first value is a dict)
+        first_value = next(iter(instr.values()), None)
+        if isinstance(first_value, dict):
+            # Nested format - extract from per-channel dictionaries
+            self.channel_names = list(instr.keys())
+            self.instr_freqs = np.array([instr[ch].get('central_freq_GHz', instr[ch].get('freq')) 
+                                         for ch in self.channel_names])
+            self.instr_beams = np.array([instr[ch].get('beam_fwhm_arcmin', instr[ch].get('beam')) 
+                                         for ch in self.channel_names])
+            self.instr_nside = np.array([instr[ch].get('nside', 512) 
+                                         for ch in self.channel_names])
+        else:
+            # Flat format
+            self.channel_names = instr.get('channel_names', default_channels)
+            self.instr_freqs = np.array(instr.get('freqs', default_freqs))
+            self.instr_beams = np.array(instr.get('beams', default_beams))
+            self.instr_nside = np.array(instr.get('nsides', default_nsides))
     
     def dust_cl(self):
         """Compute dust power spectra at pivot frequency."""
@@ -156,16 +253,16 @@ class GaussianForegroundSimulator:
         alms_s_EE, alms_s_BB = self.sync_alms_at_pivot()
         
         # Generate maps for each frequency channel
-        freq_iter = zip(self.so_freqs, self.so_beams, self.so_nside)
-        for i, (freq, beam, nside) in enumerate(tqdm(freq_iter, total=len(self.so_freqs), 
+        freq_iter = zip(self.channel_names, self.instr_freqs, self.instr_beams, self.instr_nside)
+        for i, (ch_name, freq, beam, nside) in enumerate(tqdm(freq_iter, total=len(self.instr_freqs), 
                                                        desc=f"  Sim {sim_idx:04d}", 
                                                        leave=False, ncols=120)):
             fg_Q, fg_U = self.generate_fg_map(freq, beam, nside, 
                                               alms_d_EE, alms_d_BB, 
                                               alms_s_EE, alms_s_BB)
             
-            # Create output filename
-            filename = f"sobs_gaussfg_freq{freq:03d}GHz_mc{sim_idx:03d}_nside{nside:04d}.fits"
+            # Create output filename using channel name
+            filename = f"sobs_gaussfg_{ch_name}_mc{sim_idx:03d}_nside{nside:04d}.fits"
             filepath = Path(output_dir) / filename
             
             # Save as FITS file with Q and U in separate columns
@@ -175,6 +272,7 @@ class GaussianForegroundSimulator:
             # Create header with metadata
             header = [
                 ('UNITS', 'uK_CMB', 'Map units'),
+                ('CHANNEL', ch_name, 'Channel name'),
                 ('FREQ', freq, 'Frequency in GHz'),
                 ('BEAM', beam, 'Beam FWHM in arcmin'),
                 ('SIMIDX', sim_idx, 'Simulation index'),
@@ -199,8 +297,9 @@ class GaussianForegroundSimulator:
         
         print(f"Generating {n_sims} foreground simulations...")
         print(f"Output directory: {output_path.absolute()}")
-        print(f"SO frequencies: {self.so_freqs} GHz")
-        print(f"SO nsides: {self.so_nside}")
+        print(f"Channels: {self.channel_names}")
+        print(f"Frequencies: {self.instr_freqs} GHz")
+        print(f"Nsides: {self.instr_nside}")
         print("-" * 60)
         
         for sim_idx in tqdm(range(n_sims), desc="Generating simulations", ncols=120):
@@ -208,20 +307,5 @@ class GaussianForegroundSimulator:
         
         print("-" * 60)
         print(f"Completed {n_sims} simulations!")
-        print(f"Total maps generated: {n_sims * len(self.so_freqs)}")
+        print(f"Total maps generated: {n_sims * len(self.instr_freqs)}")
 
-
-def main():
-    """Main function to run 100 simulations."""
-    # Initialize simulator
-    simulator = GaussianForegroundSimulator()
-    
-    # Set output directory
-    output_dir = "../output/foreground_sims"
-    
-    # Run 100 simulations
-    simulator.run_simulations(n_sims=5, output_dir=output_dir)
-
-
-if __name__ == "__main__":
-    main()
