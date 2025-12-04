@@ -233,7 +233,7 @@ The validation script (`validate_fg_sims.py`) performs comprehensive checks to e
 
 ### Validation Results
 
-![Validation figure](../output/foreground_sims/gaussian_fg/validation_mc000.png)
+![Validation figure](./validation/validation_mc000.png)
 
 The validation figure shows:
 
