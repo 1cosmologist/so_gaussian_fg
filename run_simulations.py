@@ -12,13 +12,13 @@ from generate_gaussian_fg import GaussianForegroundSimulator
 FG_PARAMS = "../resources/config/fg_params.yaml"
 
 # Path to instrument parameters YAML file
-INSTR_PARAMS = "../resources/config/instr_params_baseline_pessimistic.yaml"
+INSTR_PARAMS = "../resources/config/instr_params_baselineEHF_pessimistic.yaml"
 
 # Number of simulations to generate
 N_SIMS = 100
 
 # Output directory for simulations
-OUTPUT_DIR = "../output/foreground_sims/gaussian_fg/"
+OUTPUT_DIR = "../output/foreground_sims/gaussian_fg_EHF/"
 # ===========================================
 
 

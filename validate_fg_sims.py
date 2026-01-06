@@ -383,8 +383,8 @@ def validate_fg_simulations(fg_params_path, instr_params_path, output_dir, mc_id
 if __name__ == "__main__":
     # Configuration
     FG_PARAMS = "../resources/config/fg_params.yaml"
-    INSTR_PARAMS = "../resources/config/instr_params_baseline_pessimistic.yaml"
-    OUTPUT_DIR = "../output/foreground_sims/gaussian_fg/"
+    INSTR_PARAMS = "../resources/config/instr_params_baselineEHF_pessimistic.yaml"
+    OUTPUT_DIR = "../output/foreground_sims/gaussian_fg_EHF/"
     MC_IDX = 0
     
     validate_fg_simulations(FG_PARAMS, INSTR_PARAMS, OUTPUT_DIR, MC_IDX)
